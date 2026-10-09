@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CodeAlpha Robotics — 4-DOF Robotic Arm 3D Simulation</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+      background: #0B0F19;
+      color: #E2E8F0;
+      overflow: hidden;
+      display: flex;
+      height: 100vh;
+    }
+    #viewport {
+      flex: 1;
+      height: 100vh;
+      position: relative;
+    }
+    #sidebar {
+      width: 360px;
+      background: #111827;
+      border-left: 1px solid #1F2937;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      overflow-y: auto;
+      box-shadow: -4px 0 20px rgba(0,0,0,0.5);
+      z-index: 10;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #1E3A8A;
+      color: #93C5FD;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #F8FAFC;
+    }
+    .subtitle {
+      font-size: 12px;
+      color: #94A3B8;
+      line-height: 1.4;
+    }
+    .card {
+      background: #1E293B;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 14px;
+    }
+    .card-title {
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #38BDF8;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+    }
+    .control-group {
+      margin-bottom: 12px;
+    }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #CBD5E1;
+      margin-bottom: 4px;
+    }
+    .control-label span.val {
+      font-family: monospace;
+      color: #F59E0B;
+      font-weight: 600;
+    }
+    input[type=range] {
+      width: 100%;
+      accent-color: #3B82F6;
+      cursor: pointer;
+    }
+    .btn-row {
+      display: flex;
+      gap: 10px;
+    }
+    button {
+      flex: 1;
+      padding: 10px 14px;
+      background: #2563EB;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    button:hover { background: #1D4ED8; }
+    button:active { transform: scale(0.98); }
+    button.secondary {
+      background: #374151;
+      color: #E5E7EB;
+    }
+    button.secondary:hover { background: #4B5563; }
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 4px 0;
+      border-bottom: 1px solid #334155;
+    }
+    .telemetry-row:last-child { border-bottom: none; }
+    .telemetry-val {
+      font-family: monospace;
+      color: #10B981;
+      font-weight: 600;
+    }
+    #canvas-overlay {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      background: rgba(17, 24, 39, 0.85);
+      backdrop-filter: blur(8px);
+      padding: 12px 18px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      pointer-events: none;
+    }
+    #canvas-overlay h2 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #E2E8F0;
+    }
+    #canvas-overlay p {
+      font-size: 11px;
+      color: #94A3B8;
+      margin-top: 3px;
+    }
+  </style>
+  <!-- Offline Local Three.js and OrbitControls -->
+  <script src="./three.min.js"></script>
+  <script src="./OrbitControls.js"></script>
+</head>
+<body>
+  <div id="viewport">
+    <div id="canvas-overlay">
+      <h2>4-DOF Articulated Robotic Arm Simulation</h2>
+      <p>Left Click + Drag: Rotate 3D View | Right Click + Drag: Pan | Scroll: Zoom</p>
+    </div>
+  </div>
+
+  <div id="sidebar">
+    <div>
+      <span class="badge">CodeAlpha M1 Internship</span>
+      <h1 style="margin-top: 6px;">Robotic Arm 3D Model</h1>
+      <p class="subtitle">Task 2: Kinematic Simulation & Pick-and-Place Trajectory Execution</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">
+        <span>Kinematic Control</span>
+        <span style="color: #94A3B8; font-weight: normal; font-size: 11px;">Forward Kinematics</span>
+      </div>
+      <div class="control-group">
+        <div class="control-label"><span>Base Yaw (θ₁)</span><span id="v1" class="val">0.0°</span></div>
+        <input type="range" id="s1" min="-180" max="180" value="0" step="1">
+      </div>
+      <div class="control-group">
+        <div class="control-label"><span>Shoulder Pitch (θ₂)</span><span id="v2" class="val">45.0°</span></div>
+        <input type="range" id="s2" min="-30" max="110" value="45" step="1">
+      </div>
+      <div class="control-group">
+        <div class="control-label"><span>Elbow Pitch (θ₃)</span><span id="v3" class="val">-45.0°</span></div>
+        <input type="range" id="s3" min="-120" max="120" value="-45" step="1">
+      </div>
+      <div class="control-group">
+        <div class="control-label"><span>Wrist Pitch (θ₄)</span><span id="v4" class="val">0.0°</span></div>
+        <input type="range" id="s4" min="-90" max="90" value="0" step="1">
+      </div>
+      <div class="control-group">
+        <div class="control-label"><span>Gripper Aperture</span><span id="vg" class="val">Open</span></div>
+        <input type="range" id="sg" min="0" max="100" value="100" step="1">
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button id="btnAutoSim">▶ Run Pick & Place</button>
+      <button id="btnReset" class="secondary">Home Position</button>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Live Telemetry & State</div>
+      <div class="telemetry-row"><span>Status:</span><span id="t-status" class="telemetry-val" style="color: #38BDF8;">Ready</span></div>
+      <div class="telemetry-row"><span>TCP X:</span><span id="t-x" class="telemetry-val">0.0 cm</span></div>
+      <div class="telemetry-row"><span>TCP Y:</span><span id="t-y" class="telemetry-val">0.0 cm</span></div>
+      <div class="telemetry-row"><span>TCP Z:</span><span id="t-z" class="telemetry-val">0.0 cm</span></div>
+      <div class="telemetry-row"><span>Payload Attached:</span><span id="t-load" class="telemetry-val" style="color: #EF4444;">No</span></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Kinematic Specifications</div>
+      <p style="font-size: 11px; color: #94A3B8; line-height: 1.5;">
+        • <b>Base Height (L₁):</b> 15.0 cm<br>
+        • <b>Upper Arm (L₂):</b> 25.0 cm<br>
+        • <b>Forearm (L₃):</b> 20.0 cm<br>
+        • <b>End-Effector (L₄):</b> 10.0 cm<br>
+        • <b>Max Reach:</b> 55.0 cm radius<br>
+        • <b>Source:</b> (X: 24, Y: 16) | <b>Target:</b> (X: -18, Y: 25)
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const L1 = 15.0, L2 = 25.0, L3 = 20.0, L4 = 10.0;
+    let scene, camera, renderer, controls;
+    let baseGroup, shoulderGroup, upperArmGroup, forearmGroup, wristGroup, gripperL, gripperR;
+    let payloadBox, pickPlatform, placePlatform;
+    let isPayloadAttached = false;
+    let isAutoSimRunning = false;
+
+    function init() {
+      const container = document.getElementById('viewport');
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0F172A);
+
+      camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 1000);
+      camera.position.set(65, 45, 65);
+
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.shadowMap.enabled = true;
+      container.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.target.set(0, 15, 0);
+      controls.update();
+
+      // Lighting
+      const ambientLight = new THREE.AmbientLight(0xFFFFFF, 0.7);
+      scene.add(ambientLight);
+      const dirLight = new THREE.DirectionalLight(0xFFFFFF, 0.8);
+      dirLight.position.set(40, 80, 40);
+      dirLight.castShadow = true;
+      scene.add(dirLight);
+
+      // Floor Grid
+      const grid = new THREE.GridHelper(90, 30, 0x334155, 0x1E293B);
+      grid.position.y = 0;
+      scene.add(grid);
+
+      buildRoboticArm();
+      buildEnvironment();
+      setupEventListeners();
+      updateArmPose();
+      animate();
+    }
+
+    function createMat(color, roughness=0.3, metalness=0.6) {
+      return new THREE.MeshStandardMaterial({ color, roughness, metalness });
+    }
+
+    function buildRoboticArm() {
+      baseGroup = new THREE.Group();
+      scene.add(baseGroup);
+
+      // Base Pedestal
+      const basePedestal = new THREE.Mesh(
+        new THREE.CylinderGeometry(8, 9, 3, 32),
+        createMat(0x334155, 0.5, 0.3)
+      );
+      basePedestal.position.y = 1.5;
+      baseGroup.add(basePedestal);
+
+      // Turret Column
+      shoulderGroup = new THREE.Group();
+      shoulderGroup.position.y = 3;
+      baseGroup.add(shoulderGroup);
+
+      const turretCol = new THREE.Mesh(
+        new THREE.CylinderGeometry(4.5, 5, L1 - 3, 24),
+        createMat(0x1E293B)
+      );
+      turretCol.position.y = (L1 - 3) / 2;
+      shoulderGroup.add(turretCol);
+
+      // Shoulder Joint Sphere
+      const shoulderJoint = new THREE.Mesh(
+        new THREE.SphereGeometry(3.5, 24, 24),
+        createMat(0xF59E0B)
+      );
+      shoulderJoint.position.y = L1 - 3;
+      shoulderGroup.add(shoulderJoint);
+
+      // Upper Arm Group
+      upperArmGroup = new THREE.Group();
+      upperArmGroup.position.y = L1 - 3;
+      shoulderGroup.add(upperArmGroup);
+
+      const upperArmMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(2.4, 2.8, L2, 20),
+        createMat(0x2563EB)
+      );
+      upperArmMesh.position.y = L2 / 2;
+      upperArmGroup.add(upperArmMesh);
+
+      // Elbow Joint Sphere
+      const elbowJoint = new THREE.Mesh(
+        new THREE.SphereGeometry(3.0, 24, 24),
+        createMat(0xF59E0B)
+      );
+      elbowJoint.position.y = L2;
+      upperArmGroup.add(elbowJoint);
+
+      // Forearm Group
+      forearmGroup = new THREE.Group();
+      forearmGroup.position.y = L2;
+      upperArmGroup.add(forearmGroup);
+
+      const forearmMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.8, 2.2, L3, 20),
+        createMat(0x0284C7)
+      );
+      forearmMesh.position.y = L3 / 2;
+      forearmGroup.add(forearmMesh);
+
+      // Wrist Joint Sphere
+      const wristJoint = new THREE.Mesh(
+        new THREE.SphereGeometry(2.2, 20, 20),
+        createMat(0x10B981)
+      );
+      wristJoint.position.y = L3;
+      forearmGroup.add(wristJoint);
+
+      // Wrist Group
+      wristGroup = new THREE.Group();
+      wristGroup.position.y = L3;
+      forearmGroup.add(wristGroup);
+
+      const wristMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.4, 1.6, L4, 16),
+        createMat(0x0D9488)
+      );
+      wristMesh.position.y = L4 / 2;
+      wristGroup.add(wristMesh);
+
+      // Gripper Base & Fingers
+      const gripperBase = new THREE.Mesh(
+        new THREE.BoxGeometry(4.5, 1.2, 2.5),
+        createMat(0x475569)
+      );
+      gripperBase.position.y = L4;
+      wristGroup.add(gripperBase);
+
+      gripperL = new THREE.Mesh(
+        new THREE.BoxGeometry(0.8, 3.5, 1.2),
+        createMat(0xEF4444)
+      );
+      gripperL.position.set(-1.6, L4 + 1.8, 0);
+      wristGroup.add(gripperL);
+
+      gripperR = new THREE.Mesh(
+        new THREE.BoxGeometry(0.8, 3.5, 1.2),
+        createMat(0xEF4444)
+      );
+      gripperR.position.set(1.6, L4 + 1.8, 0);
+      wristGroup.add(gripperR);
+    }
+
+    function buildEnvironment() {
+      // Pick Platform (Green)
+      pickPlatform = new THREE.Mesh(
+        new THREE.BoxGeometry(10, 2, 10),
+        createMat(0x16A34A, 0.4, 0.1)
+      );
+      pickPlatform.position.set(24, 1, 16);
+      scene.add(pickPlatform);
+
+      // Place Platform (Purple)
+      placePlatform = new THREE.Mesh(
+        new THREE.BoxGeometry(10, 2, 10),
+        createMat(0x9333EA, 0.4, 0.1)
+      );
+      placePlatform.position.set(-18, 1, 25);
+      scene.add(placePlatform);
+
+      // Payload Box (Orange Cube)
+      payloadBox = new THREE.Mesh(
+        new THREE.BoxGeometry(3.2, 3.2, 3.2),
+        createMat(0xF97316, 0.2, 0.1)
+      );
+      payloadBox.position.set(24, 3.6, 16);
+      scene.add(payloadBox);
+    }
+
+    function updateArmPose() {
+      const q1 = THREE.MathUtils.degToRad(parseFloat(document.getElementById('s1').value));
+      const q2 = THREE.MathUtils.degToRad(parseFloat(document.getElementById('s2').value));
+      const q3 = THREE.MathUtils.degToRad(parseFloat(document.getElementById('s3').value));
+      const q4 = THREE.MathUtils.degToRad(parseFloat(document.getElementById('s4').value));
+      const grip = parseFloat(document.getElementById('sg').value) / 100;
+
+      shoulderGroup.rotation.y = q1;
+      upperArmGroup.rotation.z = -q2;
+      forearmGroup.rotation.z = -q3;
+      wristGroup.rotation.z = -q4;
+
+      // Gripper pinch
+      const fingerOffset = 0.5 + grip * 1.3;
+      gripperL.position.x = -fingerOffset;
+      gripperR.position.x = fingerOffset;
+
+      // Labels
+      document.getElementById('v1').textContent = document.getElementById('s1').value + '°';
+      document.getElementById('v2').textContent = document.getElementById('s2').value + '°';
+      document.getElementById('v3').textContent = document.getElementById('s3').value + '°';
+      document.getElementById('v4').textContent = document.getElementById('s4').value + '°';
+      document.getElementById('vg').textContent = grip > 0.5 ? 'Open' : 'Grip';
+
+      // Forward kinematics TCP calculation
+      const tcpWorld = new THREE.Vector3();
+      wristGroup.localToWorld(tcpWorld.set(0, L4 + 3.5, 0));
+
+      document.getElementById('t-x').textContent = tcpWorld.x.toFixed(1) + ' cm';
+      document.getElementById('t-y').textContent = tcpWorld.z.toFixed(1) + ' cm';
+      document.getElementById('t-z').textContent = tcpWorld.y.toFixed(1) + ' cm';
+
+      if (isPayloadAttached) {
+        payloadBox.position.copy(tcpWorld);
+      }
+    }
+
+    function setupEventListeners() {
+      ['s1', 's2', 's3', 's4', 'sg'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => {
+          if (!isAutoSimRunning) updateArmPose();
+        });
+      });
+
+      document.getElementById('btnReset').addEventListener('click', () => {
+        if (isAutoSimRunning) return;
+        setSliders(0, 45, -45, 0, 100);
+        detachPayload(24, 3.6, 16);
+      });
+
+      document.getElementById('btnAutoSim').addEventListener('click', runPickAndPlace);
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function setSliders(q1, q2, q3, q4, grip) {
+      document.getElementById('s1').value = q1;
+      document.getElementById('s2').value = q2;
+      document.getElementById('s3').value = q3;
+      document.getElementById('s4').value = q4;
+      if (grip !== undefined) document.getElementById('sg').value = grip;
+      updateArmPose();
+    }
+
+    function attachPayload() {
+      isPayloadAttached = true;
+      document.getElementById('t-load').textContent = 'Yes';
+      document.getElementById('t-load').style.color = '#10B981';
+    }
+
+    function detachPayload(x, y, z) {
+      isPayloadAttached = false;
+      payloadBox.position.set(x, y, z);
+      document.getElementById('t-load').textContent = 'No';
+      document.getElementById('t-load').style.color = '#EF4444';
+    }
+
+    async function interpolatePose(targetQ, durationMs, stepName) {
+      document.getElementById('t-status').textContent = stepName;
+      const startQ = [
+        parseFloat(document.getElementById('s1').value),
+        parseFloat(document.getElementById('s2').value),
+        parseFloat(document.getElementById('s3').value),
+        parseFloat(document.getElementById('s4').value),
+        parseFloat(document.getElementById('sg').value)
+      ];
+      const steps = 30;
+      const delay = durationMs / steps;
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        // smooth cosine ease
+        const ease = 0.5 * (1 - Math.cos(Math.PI * t));
+        const curQ = startQ.map((s, idx) => s + ease * (targetQ[idx] - s));
+        setSliders(curQ[0], curQ[1], curQ[2], curQ[3], curQ[4]);
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+
+    async function runPickAndPlace() {
+      if (isAutoSimRunning) return;
+      isAutoSimRunning = true;
+      document.getElementById('btnAutoSim').disabled = true;
+
+      detachPayload(24, 3.6, 16);
+
+      // Sequence
+      await interpolatePose([0, 45, -45, 0, 100], 600, 'Stage 1: Homing');
+      await interpolatePose([33.7, 58, -75, -20, 100], 1000, 'Stage 2: Approach Pick');
+      await interpolatePose([33.7, 72, -95, -25, 100], 800, 'Stage 3: Descending to Object');
+      await interpolatePose([33.7, 72, -95, -25, 10], 400, 'Stage 4: Grasping Payload');
+      attachPayload();
+
+      await interpolatePose([33.7, 45, -50, -10, 10], 800, 'Stage 5: Lifting Payload');
+      await interpolatePose([125.7, 45, -50, -10, 10], 1200, 'Stage 6: Swinging to Place');
+      await interpolatePose([125.7, 68, -90, -25, 10], 900, 'Stage 7: Lowering into Target Bin');
+      await interpolatePose([125.7, 68, -90, -25, 100], 400, 'Stage 8: Releasing Payload');
+      detachPayload(-18, 3.6, 25);
+
+      await interpolatePose([125.7, 45, -50, -10, 100], 700, 'Stage 9: Retracting Arm');
+      await interpolatePose([0, 45, -45, 0, 100], 1000, 'Stage 10: Task Completed');
+
+      document.getElementById('t-status').textContent = 'Cycle Finished';
+      document.getElementById('btnAutoSim').disabled = false;
+      isAutoSimRunning = false;
+    }
+
+    function onWindowResize() {
+      const container = document.getElementById('viewport');
+      camera.aspect = container.clientWidth / container.clientHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(container.clientWidth, container.clientHeight);
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
